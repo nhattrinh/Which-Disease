@@ -1,58 +1,34 @@
 import os, sys, re
-from pyspark import SparkConf, SparkContext
-import numpy as np
-from numpy import array, argmax
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.preprocessing import LabelEncoder
 
-conf = SparkConf()
+def main():
+    test_docs = []
+    train_docs = []
+    train_classes = []
 
-conf.set("spark.executor.memory", "6G")
-conf.set("spark.driver.memory", "8G")
-conf.set("spark.executor.cores", "4")
+    vectorizer = CountVectorizer()
+    transformer = TfidfTransformer(use_idf=False)
 
-conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-conf.set("spark.kryoserializer.buffer.max", "512")
-conf.set("spark.default.parallelism", "4")
-conf.setMaster('local[4]')
+    with open('train-1.dat','r') as infile:
+        data_split = [line.split('\t') for line in infile.read().splitlines()]
+        for d in data_split:
+            train_docs.append(d[1])
+            train_classes.append(d[0])
 
-sc = SparkContext(conf=conf)
-label_encoder = LabelEncoder()
+    with open('test-1.dat','r') as infile:
+        test_docs.extend(infile.read().splitlines())
 
-def integer_encode(label_encoder, np_arr):
-    return label_encoder.fit_transform(np_arr)
+    train_counts = vectorizer.fit_transform(train_docs,None)
+    test_counts = vectorizer.transform(test_docs)
 
-train_file = sc.textFile('./train-1.dat')
-test_file = sc.textFile('./test-1.dat')
+    train_tfidf = transformer.fit_transform(train_counts, None)
+    test_tfidf = transformer.transform(test_counts)
 
-lines = train_file.map(lambda f: f.split('\n'))
+    classifier = MultinomialNB().fit(train_tfidf, train_classes)
 
-# document_tuple is in the form of (n, '...'), where n is the class of the document
-document = lines.map(lambda line: line[0].split('\t'))
+    predictions = classifier.predict(test_tfidf)
 
-document_class_list = document.map(lambda d: d[0]).collect()
-document_words_list = document.map(lambda d: d[1])\
-                    .map(lambda str: str.split(' ')).collect()
-
-for document in document_words_list:
-    document_words_list.append(integer_encode(label_encoder, array(document)))
-    document_words_list.pop(0)
-
-# document_words_2D = np.zeros([len(document_words_list), len(max(document_words_list, key = lambda l: len(l)))], dtype=object)
-
-# for i, j in enumerate(document_words_list):
-#     document_words_2D[i][0:len(j)] = j
-
-# classifier = MultinomialNB()
-# classifier.fit(document_words_2D, document_class_list)
-
-# test_document = sc.textFile('./test-1.dat')
-
-# test_lines = test_document.map(lambda document: document.split('\n'))
-# test_words = test_lines.map(lambda line: line[0].split(' '))
-
-# for e in test_words.collect():
-#     print(classifier.predict(e))
-
-
-
+if __name__ == '__main__':
+    main()

@@ -8,7 +8,7 @@ def main():
     train_docs = []
     train_classes = []
 
-    vectorizer = CountVectorizer()
+    vectorizer = CountVectorizer(stop_words='english')
     transformer = TfidfTransformer(use_idf=False)
 
     with open('train.dat','r') as infile:
@@ -28,7 +28,7 @@ def main():
     train_tfidf = transformer.fit_transform(train_counts, None)
     test_tfidf = transformer.transform(test_counts)
 
-    classifier = SGDClassifier(tol=None, max_iter=2000).fit(train_tfidf, train_classes)
+    classifier = SGDClassifier(tol=None, max_iter=500).fit(train_tfidf, train_classes)
 
     predictions = classifier.predict(test_tfidf)
 
